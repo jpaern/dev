@@ -140,6 +140,7 @@ def main():
     dates = get_list_of_dates("2024-01-01", "2024-03-01")
     base_url = "https://www.tagesschau.de/archiv?datum="
     for date in dates:
+        __import__("ipdb").set_trace()
         logger.info(f"Processing {date}")
         url = base_url + date
         res = crawl(url, valid_classes())
