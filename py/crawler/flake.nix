@@ -19,7 +19,15 @@
             pkgs.gcc # C compiler
             pkgs.cmake # Build system generator
             pkgs.pkg-config
+            pkgs.stdenv.cc.cc.lib
+            pkgs.zlib
           ];
+          shellHook = ''
+            # fixes libstdc++ issues and libz.so issues
+            LD_LIBRARY_PATH="${
+              pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc pkgs.zlib ]
+            }":$LD_LIBRARY_PATH;
+          '';
         };
       });
 }
