@@ -1,25 +1,32 @@
-from typing import List, Tuple
-import urllib3
-from lxml import html
-from loguru import logger
-from bs4 import BeautifulSoup
-
-http = urllib3.PoolManager()
-import requests
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import List
 
 import pandas as pd
+from pandas import DataFrame
+import requests
+import urllib3
+from bs4 import BeautifulSoup
+from loguru import logger
+from lxml import html
+
+http = urllib3.PoolManager()
 
 
 @dataclass
 class Line:
-    category: List[int]
-    sub_category: str
-    text: str
-    year: str
-    month: str
-    day: str
+    finanzen: bool = False
+    ausland: bool = False
+    inland: bool = False
+    wirtschaft: bool = False
+    wissen: bool = False
+    investigativ: bool = False
+    faktenfinder: bool = False
+    sub_category: str | None = None
+    text: str = ""
+    year: str = ""
+    month: str = ""
+    day: str = ""
 
 
 @dataclass
@@ -52,10 +59,10 @@ def class_to_position(clas: str) -> str:
     return valid_classes().index(clas)
 
 
-def get_subclass(url: str) -> str:
+def get_subclass(url: str) -> str | None:
     parts = url.split("/")
-    res = ""
-    if len(parts) > 2:
+    res = None
+    if len(parts) > 3:
         res = parts[2]
 
     return res
@@ -65,24 +72,26 @@ def crawl(
     url: str, valid_classes: List[str], prefix: str = "https://www.tagesschau.de"
 ):
     logger.info(f"Crawling {url}")
-    r = http.request("GET", url)
-    data_string = r.data.decode("utf-8", errors="ignore")
+    # r = http.request("GET", url)
+    # data_string = r.data.decode("utf-8", errors="ignore")
+    r = requests.get(url)
+    data_string = r.text
     tree = html.fromstring(data_string)
     links = tree.xpath("//a")
     res = []
     for link in links:
         # import ipdb; ipdb.set_trace()
-        l = link.get("href")
-        ls = [s in l for s in valid_classes]
-        if any(ls) and l.endswith(".html"):
-            subclass = get_subclass(l)
+        ref = link.get("href")
+        ls = [s in ref for s in valid_classes]
+        if any(ls) and ref.endswith(".html"):
+            subclass = get_subclass(ref)
             int_list = list(map(int, ls))
-            res.append((int_list, subclass, prefix + l))
+            res.append((int_list, subclass, prefix + ref))
     return res
 
 
 def get_page(url: str) -> str:
-    logger.info(f"Processing url: {url}")
+    # logger.debug(f"  Processing url: {url}")
     r = requests.get(url)
     soup = BeautifulSoup(r.text, "html.parser")
     paragraphs = soup.find_all("p", class_="textabsatz")
@@ -130,32 +139,43 @@ def get_year_month_day(date: str) -> YMD:
     return YMD(year=parts[0], month=parts[1], day=parts[2])
 
 
-def save_texts(texts: List[str], class_array: List[int], base_path: str) -> None:
-    for text in texts:
-        pass
+def save_texts(df: DataFrame, file_name: str) -> None:
+    df.to_csv(file_name)
 
 
 def main():
     df = pd.DataFrame()
-    dates = get_list_of_dates("2024-01-01", "2024-03-01")
+    dates = get_list_of_dates("2024-01-01", "2024-01-02")
     base_url = "https://www.tagesschau.de/archiv?datum="
+    data = []
     for date in dates:
-        __import__("ipdb").set_trace()
+        # __import__("ipdb").set_trace()
         logger.info(f"Processing {date}")
         url = base_url + date
         res = crawl(url, valid_classes())
-        logger.info(f"Length: {len(res)}")
-        for r in res:
+        length = len(res)
+        logger.info(f"Length: {length}")
+        for i, r in enumerate(res):
             ymd = get_year_month_day(date)
+            logger.debug(f"  {i+1}/{length} Processing {r[2]}")
+            text = get_page(r[2])
             line = Line(
-                category=r[0],
+                finanzen=False,
+                ausland=False,
+                inland=False,
+                wirtschaft=False,
+                wissen=False,
+                investigativ=False,
+                faktenfinder=False,
                 sub_category=r[1],
-                text=r[2],
+                text=text,
                 year=ymd.year,
                 month=ymd.month,
                 day=ymd.day,
             )
-            df.append(line)
+            data.append(line)
+    df = DataFrame(data)
+    df.to_csv("second.csv")
 
 
 if __name__ == "__main__":
