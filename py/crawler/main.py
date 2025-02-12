@@ -1,4 +1,3 @@
-import concurrent.futures
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List
@@ -6,15 +5,13 @@ import multiprocessing as mp
 
 import pandas as pd
 import requests
-import urllib3
 from bs4 import BeautifulSoup
 from loguru import logger
 from lxml import html
-from pandas import DataFrame
 import sys
+from tqdm import tqdm
 
-http = urllib3.PoolManager()
-
+logger.remove()
 logger.add(sys.stdout, level="WARNING")
 
 
@@ -193,24 +190,34 @@ def process_date(date: str, base_url: str) -> list[Line]:
     return lines
 
 
+def process_date_wrapper(args):
+    """
+    Unpack arguments and call process_date.
+    This wrapper is defined at the module level, so it's pickleable.
+    """
+    return process_date(*args)
+
+
 def main():
-    dates = get_list_of_dates("2024-01-01", "2024-04-01")
+    dates = get_list_of_dates("2024-04-02", "2024-05-31")
     base_url = "https://www.tagesschau.de/archiv?datum="
     data = []
 
     # Prepare a list of argument tuples for each process_date call.
     args = [(date, base_url) for date in dates]
 
-    # Use multiprocessing.Pool which has starmap to unpack the argument tuples.
+    # Using Pool.imap_unordered to process dates in parallel and show progress
     with mp.Pool(processes=6) as pool:
-        results = pool.starmap(process_date, args)
-
-    # Flatten the list of lists into a single list of Line objects.
-    for lines in results:
-        data.extend(lines)
+        # Wrap the iterator with tqdm for a progress bar.
+        for lines in tqdm(
+            pool.imap_unordered(process_date_wrapper, args),
+            total=len(args),
+            desc="Processing dates",
+        ):
+            data.extend(lines)
 
     df = pd.DataFrame(data)
-    df.to_csv("forth.csv", index=False)
+    df.to_csv("fivth.csv", index=False)
 
 
 if __name__ == "__main__":
