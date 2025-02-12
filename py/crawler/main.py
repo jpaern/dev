@@ -1,16 +1,21 @@
+import concurrent.futures
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List
+import multiprocessing as mp
 
 import pandas as pd
-from pandas import DataFrame
 import requests
 import urllib3
 from bs4 import BeautifulSoup
 from loguru import logger
 from lxml import html
+from pandas import DataFrame
+import sys
 
 http = urllib3.PoolManager()
+
+logger.add(sys.stdout, level="WARNING")
 
 
 @dataclass
@@ -98,7 +103,7 @@ def get_category(ref: str, valid_classes) -> str | None:
 def crawl(
     url: str, valid_classes: List[str], prefix: str = "https://www.tagesschau.de"
 ):
-    logger.info(f"Crawling {url}")
+    logger.debug(f"Crawling {url}")
     r = requests.get(url)
     data_string = r.text
     tree = html.fromstring(data_string)
@@ -162,36 +167,50 @@ def get_year_month_day(date: str) -> YMD:
     return YMD(year=parts[0], month=parts[1], day=parts[2])
 
 
-def save_texts(df: DataFrame, file_name: str) -> None:
-    df.to_csv(file_name)
+def process_date(date: str, base_url: str) -> list[Line]:
+    """
+    Process one date: crawl the URL, then get the details for each result,
+    and return a list of Line objects.
+    """
+    logger.info(f"Processing {date}")
+    url = base_url + date
+    res = crawl(url, valid_classes())
+    lines = []
+    total = len(res)
+    for i, r in enumerate(res):
+        ymd = get_year_month_day(date)
+        logger.debug(f"  {i+1}/{total} Processing {r[2]}")
+        text = get_page(r[2])
+        line = Line(
+            category=r[0],
+            sub_category=r[1],
+            text=text,
+            year=ymd.year,
+            month=ymd.month,
+            day=ymd.day,
+        )
+        lines.append(line)
+    return lines
 
 
 def main():
-    df = pd.DataFrame()
-    dates = get_list_of_dates("2024-01-01", "2024-01-02")
+    dates = get_list_of_dates("2024-01-01", "2024-04-01")
     base_url = "https://www.tagesschau.de/archiv?datum="
     data = []
-    for date in dates:
-        logger.info(f"Processing {date}")
-        url = base_url + date
-        res = crawl(url, valid_classes())
-        length = len(res)
-        logger.info(f"Length: {length}")
-        for i, r in enumerate(res):
-            ymd = get_year_month_day(date)
-            logger.debug(f"  {i+1}/{length} Processing {r[2]}")
-            text = get_page(r[2])
-            line = Line(
-                category=r[0],
-                sub_category=r[1],
-                text=text,
-                year=ymd.year,
-                month=ymd.month,
-                day=ymd.day,
-            )
-            data.append(line)
-    df = DataFrame(data)
-    df.to_csv("third.csv")
+
+    # Prepare a list of argument tuples for each process_date call.
+    args = [(date, base_url) for date in dates]
+
+    # Use multiprocessing.Pool which has starmap to unpack the argument tuples.
+    with mp.Pool(processes=6) as pool:
+        results = pool.starmap(process_date, args)
+
+    # Flatten the list of lists into a single list of Line objects.
+    for lines in results:
+        data.extend(lines)
+
+    df = pd.DataFrame(data)
+    df.to_csv("forth.csv", index=False)
 
 
 if __name__ == "__main__":
