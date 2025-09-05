@@ -1,14 +1,14 @@
+import multiprocessing as mp
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import List
-import multiprocessing as mp
 
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 from loguru import logger
 from lxml import html
-import sys
 from tqdm import tqdm
 
 logger.remove()
@@ -192,32 +192,41 @@ def process_date(date: str, base_url: str) -> list[Line]:
 
 def process_date_wrapper(args):
     """
-    Unpack arguments and call process_date.
-    This wrapper is defined at the module level, so it's pickleable.
+    Unpack arguments and call process_date. Return a tuple (date, lines).
+    This function is defined at the module level so it's pickleable.
     """
-    return process_date(*args)
+    date, base_url = args
+    lines = process_date(date, base_url)
+    return date, lines
 
 
 def main():
-    dates = get_list_of_dates("2024-04-02", "2024-05-31")
+    dates = get_list_of_dates("2025-01-01", "2025-08-31")
     base_url = "https://www.tagesschau.de/archiv?datum="
-    data = []
 
     # Prepare a list of argument tuples for each process_date call.
     args = [(date, base_url) for date in dates]
 
-    # Using Pool.imap_unordered to process dates in parallel and show progress
-    with mp.Pool(processes=6) as pool:
-        # Wrap the iterator with tqdm for a progress bar.
-        for lines in tqdm(
+    # Dictionary to track for each month if we've already written a header.
+    monthly_files_written = {}
+
+    # Process each date in parallel.
+    with mp.Pool(processes=2) as pool:
+        for date, lines in tqdm(
             pool.imap_unordered(process_date_wrapper, args),
             total=len(args),
             desc="Processing dates",
         ):
-            data.extend(lines)
-
-    df = pd.DataFrame(data)
-    df.to_csv("fivth.csv", index=False)
+            # Assume date is in the format "YYYY-MM-DD"; extract "YYYY-MM"
+            year_month = date[:7]
+            filename = f"data/news_{year_month}.csv"
+            df = pd.DataFrame(lines)
+            # Write header only if this is the first time writing for this month.
+            write_header = not monthly_files_written.get(year_month, False)
+            # Append the day's data to the monthly file.
+            df.to_csv(filename, mode="a", header=write_header, index=False)
+            monthly_files_written[year_month] = True
+            # logger.info(f"Appended results for {date} to {filename}")
 
 
 if __name__ == "__main__":
