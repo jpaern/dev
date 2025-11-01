@@ -1,15 +1,16 @@
-from typing import List, Tuple
+from typing import List
+
 import urllib3
-from lxml import html
-from loguru import logger
 from bs4 import BeautifulSoup
+from loguru import logger
+from lxml import html
 
 http = urllib3.PoolManager()
-import requests
-from datetime import datetime, timedelta
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 import pandas as pd
+import requests
 
 
 @dataclass
@@ -44,7 +45,7 @@ def position_to_class(pos: int) -> str:
     return valid_classes()[pos]
 
 
-def class_to_position(clas: str) -> str:
+def class_to_position(clas: str) -> int:
     if not clas.startswith("/"):
         clas = "/" + clas
     if not clas.endswith("/"):
