@@ -1,1 +1,6 @@
 .direnv
+*.csv
+data
+Untitled*.ipynb
+*.tgz
+
