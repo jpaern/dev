@@ -1,3 +1,7 @@
+# Juri stuff
+.direnv
+dist-newstyle
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
