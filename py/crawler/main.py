@@ -1,18 +1,15 @@
-import multiprocessing as mp
-import sys
-from dataclasses import dataclass
+from typing import List, Tuple
+import urllib3
+from lxml import html
+from loguru import logger
+from bs4 import BeautifulSoup
+
+http = urllib3.PoolManager()
+import requests
 from datetime import datetime, timedelta
-from typing import List
+from dataclasses import dataclass
 
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
-from loguru import logger
-from lxml import html
-from tqdm import tqdm
-
-logger.remove()
-logger.add(sys.stdout, level="WARNING")
 
 
 @dataclass
@@ -72,7 +69,19 @@ def valid_classes() -> List[str]:
     ]
 
 
-def get_class(url: str) -> str | None:
+def position_to_class(pos: int) -> str:
+    return valid_classes()[pos]
+
+
+def class_to_position(clas: str) -> str:
+    if not clas.startswith("/"):
+        clas = "/" + clas
+    if not clas.endswith("/"):
+        clas = clas + "/"
+    return valid_classes().index(clas)
+
+
+def get_subclass(url: str) -> str:
     parts = url.split("/")
     res = None
     if len(parts) > 1:
