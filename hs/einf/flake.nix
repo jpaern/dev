@@ -16,14 +16,15 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        hpkgs = pkgs.haskell.packages.ghc912;
       in
       {
         devShell = pkgs.mkShell {
           buildInputs = [
-            pkgs.haskell.compiler.ghc912 # Aktuelle GHC-Version anpassen!
-            pkgs.cabal-install
-            pkgs.haskellPackages.hlint
-            pkgs.haskellPackages.haskell-language-server
+            hpkgs.ghc # Aktuelle GHC-Version anpassen!
+            hpkgs.cabal-install
+            hpkgs.hlint
+            hpkgs.haskell-language-server
             pkgs.pkg-config
             pkgs.stdenv.cc.cc.lib
             pkgs.zlib
@@ -35,8 +36,8 @@
                 pkgs.stdenv.cc.cc
                 pkgs.zlib
               ]
-            }":$LD_LIBRARY_PATH;
-            echo "Wellcome in a Haskell-Dev environment!"
+            }":$LD_LIBRARY_PATH
+            echo "Wellcome in a Haskell-Dev environment! (GHC $(ghc --version))"
           '';
         };
       }
